@@ -1,2 +1,16 @@
+# FastAPI core
 fastapi
-uvicorn
+
+# ASGI server
+uvicorn[standard]
+
+# PostgreSQL support
+psycopg2-binary
+SQLAlchemy
+
+# Data validation & settings
+pydantic
+email-validator   # enables Pydantic's EmailStr validation
+
+# Database migrations (optional but recommended)
+alembic
