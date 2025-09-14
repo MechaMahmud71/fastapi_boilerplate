@@ -1,9 +1,8 @@
-# containers.py
 from dependency_injector import containers, providers
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import sessionmaker, Session
 
-from repositories.user_repository import UserRepository
-from services.user_service import UserService
+from modules.user import UserRepository, UserService, UserController
+from utils.db_connection import SessionLocal  # your SQLAlchemy session factory
 
 
 class Container(containers.DeclarativeContainer):
@@ -11,13 +10,13 @@ class Container(containers.DeclarativeContainer):
         packages=["modules.user", "modules.auth"]
     )
 
-    # DB session provider (FastAPI will still manage sessions via get_db)
-    db = providers.Dependency(instance_of=Session)
+    # Provide the session factory (sessionmaker)
+    db_factory = providers.Object(SessionLocal)
 
     # Repository
     user_repository = providers.Factory(
         UserRepository,
-        db=db,
+        db_factory=db_factory,  # inject the factory, not a session
     )
 
     # Service
@@ -25,3 +24,13 @@ class Container(containers.DeclarativeContainer):
         UserService,
         user_repo=user_repository,
     )
+
+    # Controller
+    user_controller = providers.Factory(
+        UserController,
+        user_service=user_service,
+    )
+
+
+# Instantiate container
+container = Container()

@@ -1,7 +1,8 @@
 from fastapi import APIRouter
+from utils.container import container
 
-from modules.auth.auth_controller import AuthController
+api_router = APIRouter()
 
-api_router=APIRouter()
-
-api_router.include_router(AuthController().router)
+# Include user controller
+user_controller = container.user_controller()
+api_router.include_router(user_controller.router)
