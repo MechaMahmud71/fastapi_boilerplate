@@ -6,7 +6,7 @@ uvicorn[standard]
 
 # PostgreSQL support
 psycopg2-binary
-SQLAlchemy
+sqlalchemy
 
 # Data validation & settings
 pydantic
@@ -14,3 +14,5 @@ email-validator   # enables Pydantic's EmailStr validation
 
 # Database migrations (optional but recommended)
 alembic
+python-dotenv
+dependency-injector

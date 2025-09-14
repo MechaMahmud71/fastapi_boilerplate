@@ -1,5 +1,5 @@
-from pydantic import BaseModel
+from pydantic import BaseModel,Field
 
 class LoginDTO(BaseModel):
-  username:str
+  username:str=Field("Faruk")
   password:str
