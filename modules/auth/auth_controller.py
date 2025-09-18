@@ -3,16 +3,17 @@ from .auth_service import AuthService
 from .dtos import LoginDTO,SignupDTO
 
 class AuthController:
-  def __init__(self):
+  def __init__(self,auth_service:AuthService):
     self.router=APIRouter(prefix="/auth",tags=["Public Auth"])
     self.__add_routes()
+    self.auth_service=auth_service
 
   def __add_routes(self):
     
     @self.router.post("/login")
-    def login(body:LoginDTO,service:AuthService=Depends()):
-      return service.login(body)
+    async def login(body:LoginDTO):
+      return await self.auth_service.login(body)
     
     @self.router.post("/register")
-    def register(body:SignupDTO,service:AuthService=Depends()):
-      return body
+    async def register(body:SignupDTO):
+      return await self.auth_service.register(body)

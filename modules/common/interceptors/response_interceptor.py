@@ -34,7 +34,7 @@ class ResponseInterceptor(BaseHTTPMiddleware):
                 content={
                     "success": True,
                     "message": message,
-                    "data": data
+                    "data": data["data"] if "data" in data else data
                 },
                 status_code=response.status_code
             )

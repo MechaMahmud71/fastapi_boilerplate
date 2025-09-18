@@ -1,34 +1,34 @@
-import os
-from dotenv import load_dotenv
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker, declarative_base
+from utils.config_service import config_service
 
-load_dotenv()
+DATABASE_URL: str = config_service.get("DATABASE_URL")
 
-# Supabase PostgreSQL connection URI
-DATABASE_URL: str = os.getenv("DATABASE_URL")
+# Ensure asyncpg driver
+if DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
 
-if not DATABASE_URL:
-    raise ValueError("DATABASE_URL is not set in .env file")
-
-# SQLAlchemy engine
-engine = create_engine(
+# Disable statement caching (required for Supabase PgBouncer)
+engine = create_async_engine(
     DATABASE_URL,
-    echo=True,  # set to False in production
-    pool_pre_ping=True  # ensures stale connections are recycled
+    echo=False,
+    pool_pre_ping=True,
+    connect_args={
+        "statement_cache_size": 0,          # 🚀 disable asyncpg cache
+        "prepared_statement_cache_size": 0  # 🚀 asyncpg >= 0.29
+    },
 )
 
-# Session maker
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+AsyncSessionLocal = sessionmaker(
+    bind=engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+    autoflush=False,
+)
 
-# Base class for models
 Base = declarative_base()
 
-# FastAPI dependency for DB session
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# FastAPI dependency
+async def get_db() -> AsyncSession:
+    async with AsyncSessionLocal() as session:
+        yield session

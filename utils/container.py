@@ -1,8 +1,9 @@
+# utils/container.py
 from dependency_injector import containers, providers
-from sqlalchemy.orm import sessionmaker, Session
-
+from modules.auth.auth_controller import AuthController
+from modules.auth.auth_service import AuthService
 from modules.user import UserRepository, UserService, UserController
-from utils.db_connection import SessionLocal  # your SQLAlchemy session factory
+from utils.db_connection import AsyncSessionLocal  # ✅ use async session factory
 
 
 class Container(containers.DeclarativeContainer):
@@ -10,13 +11,13 @@ class Container(containers.DeclarativeContainer):
         packages=["modules.user", "modules.auth"]
     )
 
-    # Provide the session factory (sessionmaker)
-    db_factory = providers.Object(SessionLocal)
+    # Provide the async session factory (sessionmaker)
+    db_factory = providers.Object(AsyncSessionLocal)
 
     # Repository
     user_repository = providers.Factory(
         UserRepository,
-        db_factory=db_factory,  # inject the factory, not a session
+        db_factory=db_factory,  # inject async session factory
     )
 
     # Service
@@ -29,6 +30,16 @@ class Container(containers.DeclarativeContainer):
     user_controller = providers.Factory(
         UserController,
         user_service=user_service,
+    )
+
+    auth_service= providers.Factory(
+        AuthService,
+        user_service=user_service
+    )
+
+    auth_controller=providers.Factory(
+        AuthController,
+        auth_service=auth_service
     )
 
 
