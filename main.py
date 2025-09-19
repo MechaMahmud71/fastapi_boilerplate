@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
+from fastapi.security import HTTPBearer
 from utils.container import container
 from utils.db_connection import AsyncSessionLocal, engine, Base
 from router import api_router
@@ -11,20 +12,12 @@ from modules.common.middlewares import (
     ValidationExceptionHandler,
 )
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # ✅ Run before the app starts
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    print("✅ Tables initialized")
-
-    yield  # app runs here
-
-    # ✅ Run after the app stops (optional cleanup)
+    yield
     await engine.dispose()
-    print("✅ Engine disposed")
-
 
 def create_app() -> FastAPI:
     app = FastAPI(lifespan=lifespan)

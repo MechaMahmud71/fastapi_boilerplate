@@ -1,11 +1,13 @@
 from functools import wraps
-from utils import HttpError, config_service
+from modules.common.services import config_service
+from utils import HttpError
 from fastapi import Request
 import jwt
 
-def protected(func):
+def Protected(func):
   @wraps(func)
   async def wrapper(*args,request:Request,**kwargs):
+
     if request is None:
       raise HttpError("Request Object not found",404)
     auth_header=request.headers.get("Authorization")
@@ -17,7 +19,8 @@ def protected(func):
 
     try:
       decoded_user=jwt.decode(token,config_service.get("JWT_SECRET"),algorithms=[config_service.get("JWT_ALGORITHM")])
-      request.user=decoded_user
+      request.state.user=decoded_user
+      
     except jwt.ExpiredSignatureError:
             raise HttpError("Token Expired",401)
     except jwt.InvalidTokenError:

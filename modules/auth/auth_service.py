@@ -4,7 +4,7 @@ from modules.auth.dtos import LoginDTO,SignupDTO
 from modules.user import UserService
 from utils import HttpError
 from passlib.context import CryptContext
-from utils.config_service import config_service
+from modules.common.services.config_service import config_service
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 SECRET_KEY = config_service.get("JWT_SECRET")# use env variable in real app
