@@ -1,1 +1,1 @@
-from modules.common.services.config_service import config_service
+from src.modules.common.services.config_service import config_service

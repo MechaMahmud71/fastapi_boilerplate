@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from utils.container import container
+from src.utils.container import container
 
 api_router = APIRouter()
 

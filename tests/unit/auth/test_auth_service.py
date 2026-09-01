@@ -3,11 +3,11 @@ import jwt
 import pytest
 from passlib.context import CryptContext
 
-from modules.auth.auth_service import AuthService
-from modules.auth.dtos import LoginDTO, SignupDTO
-from modules.common.services import config_service
-from modules.user.user_model import User
-from utils import HttpError
+from src.modules.auth.auth_service import AuthService
+from src.modules.auth.dtos import LoginDTO, SignupDTO
+from src.modules.common.services import config_service
+from src.modules.user.user_model import User
+from src.utils import HttpError
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 

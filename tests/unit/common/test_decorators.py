@@ -5,14 +5,14 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel
 
-from modules.common.decorators import CurrentUser, Protected, RoleGuard, Roles
-from modules.common.interceptors import ResponseInterceptor
-from modules.common.middlewares import (
+from src.modules.common.decorators import CurrentUser, Protected, RoleGuard, Roles
+from src.modules.common.interceptors import ResponseInterceptor
+from src.modules.common.middlewares import (
     GenericErrorHandler,
     HttpErrorHandler,
     ValidationExceptionHandler,
 )
-from utils.decorators import ExecutionContext, create_guard, create_param_decorator
+from src.utils.decorators import ExecutionContext, create_guard, create_param_decorator
 
 from tests.asgi_client import ASGIClient
 from tests.conftest import make_token

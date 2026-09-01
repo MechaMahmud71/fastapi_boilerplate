@@ -2,9 +2,9 @@
 import jwt
 from fastapi.security import HTTPBearer
 
-from modules.common.services import config_service
-from utils.decorators import ExecutionContext, create_guard
-from utils.expection import HttpError
+from src.modules.common.services import config_service
+from src.utils.decorators import ExecutionContext, create_guard
+from src.utils.expection import HttpError
 
 # auto_error=False: we raise HttpError ourselves so failures come out in the
 # standard error envelope instead of FastAPI's bare {"detail": ...}.

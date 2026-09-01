@@ -1,1 +1,1 @@
-from modules.common.interceptors.response_interceptor import ResponseInterceptor
+from src.modules.common.interceptors.response_interceptor import ResponseInterceptor

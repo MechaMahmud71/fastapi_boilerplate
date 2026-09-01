@@ -6,7 +6,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import HTTPException, RequestValidationError
 from fastapi.responses import JSONResponse
 
-from utils.response import error_envelope
+from src.utils.response import error_envelope
 
 logger = logging.getLogger(__name__)
 

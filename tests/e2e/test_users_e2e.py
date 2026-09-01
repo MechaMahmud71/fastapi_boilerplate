@@ -51,7 +51,7 @@ def test_create_user_returns_201(client, auth_headers):
 def test_create_user_hashes_the_password(client, auth_headers, loop):
     from sqlalchemy import text
 
-    from utils.db_connection import engine
+    from src.utils.db_connection import engine
 
     client.post(
         "/users/", json={"username": "bob", "password": "pw"}, headers=auth_headers

@@ -41,7 +41,7 @@ def pytest_pyfunc_call(pyfuncitem):
         asyncio.run(test(**kwargs))
     return True
 
-from modules.common.services import config_service
+from src.modules.common.services import config_service
 
 
 def make_token(claims: dict = None, expires_in_minutes: int = 60) -> str:

@@ -1,1 +1,1 @@
-from helpers.get_current_user import get_current_user
+from src.helpers.get_current_user import get_current_user

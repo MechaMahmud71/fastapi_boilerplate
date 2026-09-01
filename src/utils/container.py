@@ -1,14 +1,14 @@
 # utils/container.py
 from dependency_injector import containers, providers
-from modules.auth.auth_controller import AuthController
-from modules.auth.auth_service import AuthService
-from modules.user import UserRepository, UserService, UserController
-from utils.db_connection import AsyncSessionLocal  # ✅ use async session factory
+from src.modules.auth.auth_controller import AuthController
+from src.modules.auth.auth_service import AuthService
+from src.modules.user import UserRepository, UserService, UserController
+from src.utils.db_connection import AsyncSessionLocal  # ✅ use async session factory
 
 
 class Container(containers.DeclarativeContainer):
     wiring_config = containers.WiringConfiguration(
-        packages=["modules.user", "modules.auth"]
+        packages=["src.modules.user", "src.modules.auth"]
     )
 
     # Provide the async session factory (sessionmaker)

@@ -4,13 +4,13 @@ from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel
 
-from modules.common.middlewares import (
+from src.modules.common.middlewares import (
     GenericErrorHandler,
     HttpErrorHandler,
     ValidationExceptionHandler,
 )
 from tests.asgi_client import ASGIClient
-from utils import HttpError
+from src.utils import HttpError
 
 
 class Body(BaseModel):

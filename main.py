@@ -3,11 +3,11 @@ from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.security import HTTPBearer
-from utils.container import container
-from utils.db_connection import AsyncSessionLocal, engine
+from src.utils.container import container
+from src.utils.db_connection import AsyncSessionLocal, engine
 from router import api_router
-from modules.common.interceptors import ResponseInterceptor
-from modules.common.middlewares import (
+from src.modules.common.interceptors import ResponseInterceptor
+from src.modules.common.middlewares import (
     HttpErrorHandler,
     GenericErrorHandler,
     ValidationExceptionHandler,

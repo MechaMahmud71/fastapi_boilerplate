@@ -3,7 +3,7 @@ from typing import Optional, Sequence
 from sqlalchemy import select
 
 from .user_model import User
-from modules.user.dtos import CreateUserDTO, UpdateUserDTO
+from src.modules.user.dtos import CreateUserDTO, UpdateUserDTO
 
 
 class UserRepository:

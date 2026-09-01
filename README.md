@@ -63,7 +63,7 @@ is a runtime error on 3.9.
 
 ### Layers
 
-Each feature lives in `modules/<feature>/` and is split into four layers. Data
+Each feature lives in `src/modules/<feature>/` and is split into four layers. Data
 flows strictly downward; each layer only knows about the one directly below it.
 
 ```
@@ -91,7 +91,7 @@ HTTP request
 └─────────────────┘
 ```
 
-**DTOs** (`modules/<feature>/dtos/`) are Pydantic models describing request
+**DTOs** (`src/modules/<feature>/dtos/`) are Pydantic models describing request
 bodies. They are the boundary contract; ORM models never come in from the
 outside.
 
@@ -132,7 +132,7 @@ envelope and passes them through untouched instead of double-wrapping.
 
 ### Dependency injection
 
-Wiring lives in [`utils/container.py`](utils/container.py). Providers are
+Wiring lives in [`src/utils/container.py`](src/utils/container.py). Providers are
 declared once and composed; nothing constructs its own dependencies.
 
 ```python
@@ -197,7 +197,7 @@ exception) it holds a single element equal to `message`, so a client can render
 `errors` uniformly without special-casing.
 
 This is applied centrally by
-[`ResponseInterceptor`](modules/common/interceptors/response_interceptor.py),
+[`ResponseInterceptor`](src/modules/common/interceptors/response_interceptor.py),
 so **controllers just return their payload** — no wrapping by hand:
 
 ```python
@@ -206,7 +206,7 @@ async def get_user(user_id: int):
     return await self.user_service.get_user(user_id)   # → {"success": true, "data": {...}, "message": null}
 ```
 
-Both shapes are defined in one place, [`utils/response.py`](utils/response.py)
+Both shapes are defined in one place, [`src/utils/response.py`](src/utils/response.py)
 (`envelope` and `error_envelope`), and shared with the error handlers so the
 two can never drift apart.
 
@@ -227,11 +227,11 @@ interceptor entirely.
 
 ### Error handling
 
-Raise [`HttpError`](utils/expection.py) anywhere — services included — and the
+Raise [`HttpError`](src/utils/expection.py) anywhere — services included — and the
 right response comes out the other end:
 
 ```python
-from utils import HttpError
+from src.utils import HttpError
 
 if not user:
     raise HttpError("User not found", 404)
@@ -248,7 +248,7 @@ if not user:
 
 All three build their body with `error_envelope`. They are registered in
 [`main.py`](main.py) and defined in
-[`error_handler_middleware.py`](modules/common/middlewares/error_handler_middleware.py):
+[`error_handler_middleware.py`](src/modules/common/middlewares/error_handler_middleware.py):
 
 | Handler                      | Catches                   | Status                |
 | ---------------------------- | ------------------------- | --------------------- |
@@ -290,11 +290,11 @@ auth routes return the payload bare — the envelope is added by the interceptor
 ```
 
 Protect a route with the
-[`@Protected`](modules/common/decorators/protected_decorator.py) decorator — it
+[`@Protected`](src/modules/common/decorators/protected_decorator.py) decorator — it
 acts as an auth guard. It verifies the `Authorization: Bearer <token>` header,
 rejects a missing/invalid/expired token with `401`, and attaches the decoded
 payload to `request.state.user`, which
-[`get_current_user`](helpers/get_current_user.py) reads back:
+[`get_current_user`](src/helpers/get_current_user.py) reads back:
 
 ```python
 @self.router.get("/me")
@@ -318,7 +318,7 @@ async def delete_user(user_id: int, request: Request):
 
 ### Building decorators (NestJS-style)
 
-[`utils/decorators.py`](utils/decorators.py) provides three factories that
+[`src/utils/decorators.py`](src/utils/decorators.py) provides three factories that
 mirror Nest's decorator toolkit, so guards and injectors are declarative rather
 than hand-rolled:
 
@@ -334,7 +334,7 @@ and values produced by earlier guards). Return `False` to reject, raise
 guard's `provides` name.
 
 ```python
-from utils.decorators import ExecutionContext, create_guard, create_param_decorator
+from src.utils.decorators import ExecutionContext, create_guard, create_param_decorator
 
 def api_key_guard(ctx: ExecutionContext) -> bool:
     return ctx.request.headers.get("X-API-Key") == expected_key
@@ -350,14 +350,14 @@ async def keyed():
 The auth decorators are built with these, one concern per file:
 
 ```python
-# modules/common/decorators/protected_decorator.py  — authentication
+# src/modules/common/decorators/protected_decorator.py  — authentication
 Protected   = create_guard(jwt_guard, security=bearer_scheme, provides="user")
 
-# modules/common/decorators/role_decorator.py       — authorisation
+# src/modules/common/decorators/role_decorator.py       — authorisation
 RoleGuard   = create_guard(roles_guard, message="Insufficient permissions", status_code=403)
 Roles       = lambda *roles: set_metadata("roles", list(roles))
 
-# modules/common/decorators/user_decorator.py       — parameter injection
+# src/modules/common/decorators/user_decorator.py       — parameter injection
 CurrentUser = create_param_decorator(lambda ctx: ctx.get("user"))
 ```
 
@@ -392,45 +392,48 @@ Two implementation details worth knowing:
 ├── alembic.ini                  # Alembic config (DB URL is injected at runtime)
 ├── docker-compose.yml           # PostgreSQL + pgAdmin
 │
-├── tests/                       # pytest suite
-│   ├── conftest.py              # JWT + client fixtures
-│   ├── asgi_client.py           # dependency-free ASGI test client
-│   └── test_decorators.py       # guards, metadata, param decorators
+├── src/                         # application package
+│   ├── modules/
+│   │   ├── auth/                # login / register
+│   │   │   ├── auth_controller.py
+│   │   │   ├── auth_service.py          # JWT issuing, credential checks
+│   │   │   └── dtos/
+│   │   ├── user/                # user CRUD
+│   │   │   ├── user_controller.py
+│   │   │   ├── user_service.py          # hashing, uniqueness, 404s
+│   │   │   ├── user_repository.py
+│   │   │   ├── user_model.py
+│   │   │   └── dtos/                    # Create / Update / UserPublic
+│   │   ├── todo/                # scaffolded, not implemented
+│   │   └── common/              # cross-cutting concerns
+│   │       ├── interceptors/            # ResponseInterceptor
+│   │       ├── middlewares/             # error handlers
+│   │       ├── decorators/
+│   │       │   ├── protected_decorator.py   # @Protected (authn)
+│   │       │   ├── role_decorator.py        # @RoleGuard, @Roles (authz)
+│   │       │   └── user_decorator.py        # CurrentUser (param injection)
+│   │       └── services/                # ConfigService (.env access)
+│   │
+│   ├── utils/
+│   │   ├── container.py         # dependency-injector wiring
+│   │   ├── db_connection.py     # async engine, session factory, declarative Base
+│   │   ├── response.py          # the response envelope
+│   │   ├── decorators.py        # guard / metadata / param-decorator factories
+│   │   ├── security.py          # password hashing helpers
+│   │   └── expection.py         # HttpError
+│   │
+│   └── helpers/
+│       └── get_current_user.py
 │
 ├── migrations/                  # Alembic migration environment
 │   ├── env.py                   # reads DATABASE_URL, points at Base.metadata
 │   └── versions/                # migration scripts
 │
-├── modules/
-│   ├── auth/                    # login / register
-│   │   ├── auth_controller.py
-│   │   ├── auth_service.py      # bcrypt hashing, JWT issuing
-│   │   └── dtos/
-│   ├── user/                    # user CRUD
-│   │   ├── user_controller.py
-│   │   ├── user_service.py
-│   │   ├── user_repository.py
-│   │   ├── user_model.py
-│   │   └── dtos/
-│   ├── todo/                    # scaffolded, not implemented
-│   └── common/                  # cross-cutting concerns
-│       ├── interceptors/        # ResponseInterceptor
-│       ├── middlewares/         # error handlers
-│       ├── decorators/
-│       │   ├── protected_decorator.py   # @Protected (authn)
-│       │   ├── role_decorator.py        # @RoleGuard, @Roles (authz)
-│       │   └── user_decorator.py        # CurrentUser (param injection)
-│       └── services/            # ConfigService (.env access)
-│
-├── utils/
-│   ├── container.py             # dependency-injector wiring
-│   ├── db_connection.py         # async engine, session factory, declarative Base
-│   ├── response.py              # the response envelope
-│   ├── decorators.py            # guard / metadata / param-decorator factories
-│   └── expection.py             # HttpError
-│
-└── helpers/
-    └── get_current_user.py
+└── tests/
+    ├── conftest.py              # JWT fixtures + the async-test runner
+    ├── asgi_client.py           # dependency-free ASGI client
+    ├── unit/                    # no database
+    └── e2e/                     # real app + real database
 ```
 
 ---
@@ -546,7 +549,7 @@ stays commented out) and points `target_metadata` at the app's `Base`.
 not see it — and will happily generate a migration that drops its table:
 
 ```python
-from modules.user.user_model import User  # noqa: F401
+from src.modules.user.user_model import User  # noqa: F401
 ```
 
 ### Common commands
@@ -647,7 +650,7 @@ tests/
     └── test_users_e2e.py   # CRUD + the /users/me guard
 ```
 
-Mirror the `modules/` tree: a new `modules/todo/` gets `tests/unit/todo/` and a
+Mirror the `src/modules/` tree: a new `src/modules/todo/` gets `tests/unit/todo/` and a
 `tests/e2e/test_todo_e2e.py`.
 
 ### Which kind of test to write
@@ -825,7 +828,7 @@ the engine's pool is bound to it:
 
 ```python
 from sqlalchemy import text
-from utils.db_connection import engine
+from src.utils.db_connection import engine
 
 def test_user_row_is_written(client, register, loop):
     register("alice")
@@ -915,12 +918,12 @@ Do the same in any new test module that imports app code directly.
 
 Using `todo` as the example (the directory is already scaffolded):
 
-1. **Model** — `modules/todo/todo_model.py`, inheriting the shared `Base`:
+1. **Model** — `src/modules/todo/todo_model.py`, inheriting the shared `Base`:
 
    ```python
    from sqlalchemy import ForeignKey, String
    from sqlalchemy.orm import Mapped, mapped_column
-   from utils.db_connection import Base
+   from src.utils.db_connection import Base
 
    class Todo(Base):
        __tablename__ = "todos"
@@ -930,7 +933,7 @@ Using `todo` as the example (the directory is already scaffolded):
        user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
    ```
 
-2. **DTOs** — `modules/todo/dtos/` for create and update payloads. Give every
+2. **DTOs** — `src/modules/todo/dtos/` for create and update payloads. Give every
    optional field an explicit `= None` default; in Pydantic v2, `Optional[str]`
    without a default is still **required**.
 
@@ -941,7 +944,7 @@ Using `todo` as the example (the directory is already scaffolded):
 
 5. **Controller** — a class owning an `APIRouter(prefix="/todos", tags=["Todos"])`.
 
-6. **Register in the container** ([`utils/container.py`](utils/container.py)):
+6. **Register in the container** ([`src/utils/container.py`](src/utils/container.py)):
 
    ```python
    todo_repository = providers.Factory(TodoRepository, db_factory=db_factory)
@@ -949,7 +952,7 @@ Using `todo` as the example (the directory is already scaffolded):
    todo_controller = providers.Factory(TodoController, todo_service=todo_service)
    ```
 
-   …and add `"modules.todo"` to the `WiringConfiguration` packages list.
+   …and add `"src.modules.todo"` to the `WiringConfiguration` packages list.
 
 7. **Mount in** [`router.py`](router.py):
 
@@ -972,7 +975,7 @@ filenames) have all been fixed and have regression tests.
 
 Two things to be aware of rather than bugs:
 
-1. **`modules/todo/` is scaffolded but empty.** The files are named correctly
+1. **`src/modules/todo/` is scaffolded but empty.** The files are named correctly
    now (`todo_service.py`, …) and ready to fill in — see
    [Adding a new module](#adding-a-new-module).
 2. **`JWT_SECRET` in `.env.example` is a development placeholder.** Generate a

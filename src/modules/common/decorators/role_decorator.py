@@ -9,7 +9,7 @@ Stack it under @Protected — it reads the user that guard published:
     async def admin_only(user: dict = CurrentUser):
         ...
 """
-from utils.decorators import ExecutionContext, create_guard, set_metadata
+from src.utils.decorators import ExecutionContext, create_guard, set_metadata
 
 #: Metadata key the guard reads.
 ROLES_METADATA_KEY = "roles"

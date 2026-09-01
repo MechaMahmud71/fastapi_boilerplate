@@ -8,7 +8,7 @@ route must be guarded — on an unguarded route it resolves to None:
     async def me(user: dict = CurrentUser):
         return user
 """
-from utils.decorators import create_param_decorator
+from src.utils.decorators import create_param_decorator
 
 #: Key under which @Protected publishes the decoded JWT payload.
 USER_CONTEXT_KEY = "user"

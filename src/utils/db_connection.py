@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from sqlalchemy.orm import DeclarativeBase
-from modules.common.services import config_service
+from src.modules.common.services import config_service
 
 DATABASE_URL: str = config_service.get("DATABASE_URL")
 

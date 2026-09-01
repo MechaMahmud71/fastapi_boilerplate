@@ -1,7 +1,7 @@
-from modules.common.decorators.protected_decorator import (
+from src.modules.common.decorators.protected_decorator import (
     Protected,
     bearer_scheme,
     jwt_guard,
 )
-from modules.common.decorators.role_decorator import RoleGuard, Roles, roles_guard
-from modules.common.decorators.user_decorator import CurrentUser
+from src.modules.common.decorators.role_decorator import RoleGuard, Roles, roles_guard
+from src.modules.common.decorators.user_decorator import CurrentUser

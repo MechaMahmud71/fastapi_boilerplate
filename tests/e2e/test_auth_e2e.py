@@ -1,7 +1,7 @@
 """End-to-end auth flows against the real app and database."""
 import jwt
 
-from modules.common.services import config_service
+from src.modules.common.services import config_service
 
 
 def test_register_creates_a_user_and_returns_a_token(client):
@@ -27,7 +27,7 @@ def test_register_response_never_includes_the_password(client):
 def test_registered_password_is_hashed_in_the_database(client, loop):
     from sqlalchemy import text
 
-    from utils.db_connection import engine
+    from src.utils.db_connection import engine
 
     client.post("/auth/register", json={"username": "alice", "password": "secret123"})
 

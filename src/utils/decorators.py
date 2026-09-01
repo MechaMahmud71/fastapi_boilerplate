@@ -28,7 +28,7 @@ from typing import Any, Awaitable, Callable, Dict, Optional, Union
 from fastapi import Depends, Request
 from fastapi.security.base import SecurityBase
 
-from utils.expection import HttpError
+from src.utils.expection import HttpError
 
 METADATA_ATTR = "__route_metadata__"
 CONTEXT_STATE_KEY = "__guard_context__"

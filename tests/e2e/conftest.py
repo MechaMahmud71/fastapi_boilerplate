@@ -9,7 +9,7 @@ import pytest
 from sqlalchemy import text
 
 import main  # noqa: F401  (also resolves the modules/utils circular import)
-from utils.db_connection import engine
+from src.utils.db_connection import engine
 
 
 @pytest.fixture(scope="session")

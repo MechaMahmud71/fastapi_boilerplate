@@ -4,7 +4,7 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
-from utils.response import envelope, error_envelope
+from src.utils.response import envelope, error_envelope
 
 SKIP_PREFIXES = ("/openapi", "/docs", "/redoc")
 
