@@ -1,0 +1,50 @@
+# Production stack: app + database only. No pgAdmin, no exposed database port.
+# Usage: docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: fastapi-boilerplate:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      APP_ENV: production
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      JWT_EXPIRE_TIME: ${JWT_EXPIRE_TIME:-60}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      ENABLE_DOCS: ${ENABLE_DOCS:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      # Bind to localhost only: a reverse proxy (nginx/Caddy) terminates TLS
+      # and forwards here. Change to "80:8000" only if nothing sits in front.
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=4).status == 200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    # No `ports:` — the database is reachable only from the compose network.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  db-data:

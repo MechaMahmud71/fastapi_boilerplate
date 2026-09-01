@@ -2,6 +2,8 @@
 from dependency_injector import containers, providers
 from src.modules.auth.auth_controller import AuthController
 from src.modules.auth.auth_service import AuthService
+from src.modules.health.health_controller import HealthController
+from src.modules.health.health_service import HealthService
 from src.modules.todo.todo_controller import TodoController
 from src.modules.todo.todo_repository import TodoRepository
 from src.modules.todo.todo_service import TodoService
@@ -13,7 +15,12 @@ from src.utils.db_connection import AsyncSessionLocal  # ✅ use async session f
 
 class Container(containers.DeclarativeContainer):
     wiring_config = containers.WiringConfiguration(
-        packages=["src.modules.user", "src.modules.auth", "src.modules.todo"]
+        packages=[
+            "src.modules.user",
+            "src.modules.auth",
+            "src.modules.todo",
+            "src.modules.health",
+        ]
     )
 
     # Provide the async session factory (sessionmaker)
@@ -51,6 +58,17 @@ class Container(containers.DeclarativeContainer):
     todo_controller = providers.Factory(
         TodoController,
         todo_service=todo_service,
+    )
+
+    # Health
+    health_service = providers.Factory(
+        HealthService,
+        db_factory=db_factory,
+    )
+
+    health_controller = providers.Factory(
+        HealthController,
+        health_service=health_service,
     )
 
     auth_service= providers.Factory(

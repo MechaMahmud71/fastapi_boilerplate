@@ -29,6 +29,12 @@ migrations.
   - [5. Run the app](#5-run-the-app)
 - [Database migrations](#database-migrations)
 - [API reference](#api-reference)
+- [Deployment](#deployment)
+  - [Production checklist](#production-checklist)
+  - [Option A — Docker Compose](#option-a--docker-compose)
+  - [Option B — systemd on a VM](#option-b--systemd-on-a-vm)
+  - [Reverse proxy (nginx)](#reverse-proxy-nginx)
+  - [Production environment variables](#production-environment-variables)
 - [Testing](#testing)
   - [Which kind of test to write](#which-kind-of-test-to-write)
   - [Writing a unit test](#writing-a-unit-test)
@@ -415,7 +421,12 @@ Two implementation details worth knowing:
 
 ```
 .
-├── main.py                      # app factory, middleware + handler registration, lifespan
+├── main.py                      # app factory, CORS, docs gating, handler registration
+├── Dockerfile                   # multi-stage production image (non-root)
+├── docker-compose.prod.yml      # production stack: api + postgres
+├── .env.production.example      # production configuration template
+├── scripts/entrypoint.sh        # waits for the DB, migrates, execs the server
+├── deploy/fastapi-app.service   # systemd unit for VM deployments
 ├── router.py                    # resolves controllers from the DI container, mounts routers
 ├── alembic.ini                  # Alembic config (DB URL is injected at runtime)
 ├── docker-compose.yml           # PostgreSQL + pgAdmin
@@ -432,6 +443,7 @@ Two implementation details worth knowing:
 │   │   │   ├── user_repository.py
 │   │   │   ├── user_model.py
 │   │   │   └── dtos/                    # Create / Update / UserPublic
+│   │   ├── health/              # liveness + readiness probes
 │   │   ├── todo/                # todo CRUD, owned by a user
 │   │   │   ├── todo_controller.py
 │   │   │   ├── todo_service.py          # ownership rules
@@ -762,6 +774,187 @@ curl http://127.0.0.1:8000/users/me \
 ```
 
 ---
+
+## Deployment
+
+Two supported paths: **Docker Compose** (recommended) or **systemd on a VM**.
+Both apply migrations before serving traffic.
+
+### Production checklist
+
+Before the first deploy:
+
+- [ ] Generate a real `JWT_SECRET` (32+ bytes) — the dev placeholder is unsafe
+- [ ] Set `APP_ENV=production` (disables `/docs`, `/redoc`, `/openapi.json`)
+- [ ] Set `CORS_ORIGINS` to your exact frontend origins (empty = CORS off)
+- [ ] Use a strong `POSTGRES_PASSWORD`; never ship `faruk/faruk`
+- [ ] Put TLS in front (nginx, Caddy, or a load balancer) — uvicorn should not face the internet
+- [ ] Point your load balancer at `GET /health/ready`
+- [ ] Confirm `.env.production` is not committed (`.env*` is gitignored)
+
+### Option A — Docker Compose
+
+```bash
+# 1. configuration
+cp .env.production.example .env.production
+python -c "import secrets; print(secrets.token_urlsafe(32))"   # paste as JWT_SECRET
+$EDITOR .env.production
+
+# 2. build
+docker compose -f docker-compose.prod.yml --env-file .env.production build
+
+# 3. start (database first, then the API once it is healthy)
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+
+# 4. verify
+docker compose -f docker-compose.prod.yml ps
+curl -fsS http://127.0.0.1:8000/health
+curl -fsS http://127.0.0.1:8000/health/ready
+```
+
+Migrations run automatically in the container entrypoint before the server
+starts. Set `RUN_MIGRATIONS=false` to skip that — for example when several
+replicas start at once and only one should migrate.
+
+**Operating it:**
+
+```bash
+docker compose -f docker-compose.prod.yml logs -f api      # follow logs
+docker compose -f docker-compose.prod.yml restart api      # restart
+docker compose -f docker-compose.prod.yml down             # stop (keeps data)
+docker compose -f docker-compose.prod.yml down -v          # stop AND DELETE the database volume
+```
+
+**Redeploying a new version:**
+
+```bash
+git pull
+docker compose -f docker-compose.prod.yml --env-file .env.production build
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+```
+
+**Running a migration by hand** (or any one-off command):
+
+```bash
+docker compose -f docker-compose.prod.yml exec api alembic upgrade head
+docker compose -f docker-compose.prod.yml exec api alembic current
+docker compose -f docker-compose.prod.yml exec postgres psql -U app -d app
+```
+
+**Database backup and restore:**
+
+```bash
+docker compose -f docker-compose.prod.yml exec -T postgres \
+  pg_dump -U app app > backup-$(date +%F).sql
+
+cat backup-2026-09-02.sql | docker compose -f docker-compose.prod.yml exec -T postgres \
+  psql -U app app
+```
+
+### Option B — systemd on a VM
+
+```bash
+# 1. code and dependencies
+sudo useradd --system --create-home --home-dir /srv/app appuser
+sudo -u appuser git clone <repo> /srv/app
+cd /srv/app
+sudo -u appuser python3.12 -m venv venv
+sudo -u appuser ./venv/bin/pip install -r requirements.txt
+
+# 2. configuration
+sudo -u appuser cp .env.production.example .env.production
+sudo -u appuser $EDITOR .env.production            # set DATABASE_URL and JWT_SECRET
+sudo chmod 600 /srv/app/.env.production
+
+# 3. install the service
+sudo cp deploy/fastapi-app.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now fastapi-app
+
+# 4. verify
+sudo systemctl status fastapi-app
+curl -fsS http://127.0.0.1:8000/health/ready
+```
+
+The unit runs `alembic upgrade head` as `ExecStartPre`, so migrations are
+applied on every start and restart.
+
+**Operating it:**
+
+```bash
+sudo journalctl -u fastapi-app -f          # follow logs
+sudo systemctl restart fastapi-app         # restart
+sudo systemctl stop fastapi-app            # stop
+```
+
+**Redeploying:**
+
+```bash
+cd /srv/app
+sudo -u appuser git pull
+sudo -u appuser ./venv/bin/pip install -r requirements.txt
+sudo systemctl restart fastapi-app         # migrations run via ExecStartPre
+```
+
+### Reverse proxy (nginx)
+
+Uvicorn does not terminate TLS. Put nginx in front:
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name api.example.com;
+
+    ssl_certificate     /etc/letsencrypt/live/api.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/api.example.com/privkey.pem;
+
+    location / {
+        proxy_pass         http://127.0.0.1:8000;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+Add `--proxy-headers --forwarded-allow-ips='*'` to the uvicorn command so the
+app sees the real client IP and scheme.
+
+### Health endpoints
+
+| Endpoint        | Checks                    | Use for                                   |
+| --------------- | ------------------------- | ----------------------------------------- |
+| `/health`       | process is up             | container liveness — restart if it fails  |
+| `/health/ready` | database is reachable     | load balancer readiness — `503` pulls the instance out of rotation |
+
+Neither requires a token.
+
+### Production environment variables
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `APP_ENV` | `development` | `production` disables docs and defaults CORS to closed |
+| `DATABASE_URL` | — | required; `postgresql+asyncpg://…` |
+| `JWT_SECRET` | — | required; 32+ bytes |
+| `JWT_ALGORITHM` | `HS256` | |
+| `JWT_EXPIRE_TIME` | `60` | access-token lifetime, minutes |
+| `CORS_ORIGINS` | `*` in dev, empty in prod | comma-separated exact origins |
+| `CORS_ALLOW_CREDENTIALS` | `true` | |
+| `ENABLE_DOCS` | on in dev, off in prod | forces `/docs` on or off |
+| `LOG_LEVEL` | `INFO` | |
+| `RUN_MIGRATIONS` | `true` | container entrypoint only |
+| `APP_NAME` / `APP_VERSION` | boilerplate defaults | shown in OpenAPI |
+
+### Scaling notes
+
+* **Workers:** `(2 × CPU cores) + 1` is the usual starting point. Each worker
+  holds its **own** database connection pool, so `workers × pool_size` must stay
+  under Postgres' `max_connections` (default 100).
+* **Multiple replicas:** set `RUN_MIGRATIONS=false` on all but one, or run
+  `alembic upgrade head` as a separate deploy step, so replicas do not race.
+* **Graceful shutdown:** the entrypoint `exec`s uvicorn so it becomes PID 1 and
+  receives `SIGTERM` directly; in-flight requests finish before exit.
 
 ## Testing
 

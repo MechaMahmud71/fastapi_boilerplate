@@ -1,0 +1,29 @@
+# Systemd unit for a bare-metal / VM deployment (no Docker).
+#   sudo cp deploy/fastapi-app.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now fastapi-app
+[Unit]
+Description=FastAPI Boilerplate
+After=network.target postgresql.service
+
+[Service]
+Type=exec
+User=appuser
+Group=appuser
+WorkingDirectory=/srv/app
+EnvironmentFile=/srv/app/.env.production
+ExecStartPre=/srv/app/venv/bin/alembic upgrade head
+ExecStart=/srv/app/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
