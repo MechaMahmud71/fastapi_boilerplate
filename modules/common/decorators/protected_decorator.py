@@ -1,31 +1,40 @@
-from functools import wraps
-from modules.common.services import config_service
-from utils import HttpError
-from fastapi import Request
+"""Authentication guard, built with the factories in utils.decorators."""
 import jwt
+from fastapi.security import HTTPBearer
 
-def Protected(func):
-  @wraps(func)
-  async def wrapper(*args,request:Request,**kwargs):
+from modules.common.services import config_service
+from utils.decorators import ExecutionContext, create_guard
+from utils.expection import HttpError
 
-    if request is None:
-      raise HttpError("Request Object not found",404)
-    auth_header=request.headers.get("Authorization")
+# auto_error=False: we raise HttpError ourselves so failures come out in the
+# standard error envelope instead of FastAPI's bare {"detail": ...}.
+bearer_scheme = HTTPBearer(auto_error=False)
 
-    if not auth_header or not auth_header.startswith("Bearer "):
-      raise HttpError("Token not found",404)
-    
-    token=auth_header.split(" ")[1]
+UNAUTHORIZED_HEADERS = {"WWW-Authenticate": "Bearer"}
+
+
+def jwt_guard(context: ExecutionContext) -> dict:
+    """Verify the bearer token and return its decoded payload."""
+    credentials = context.credentials
+    if credentials is None or not credentials.credentials:
+        raise HttpError("Token not found", 401, UNAUTHORIZED_HEADERS)
 
     try:
-      decoded_user=jwt.decode(token,config_service.get("JWT_SECRET"),algorithms=[config_service.get("JWT_ALGORITHM")])
-      request.state.user=decoded_user
-      
+        decoded_user = jwt.decode(
+            credentials.credentials,
+            config_service.get("JWT_SECRET"),
+            algorithms=[config_service.get("JWT_ALGORITHM")],
+        )
     except jwt.ExpiredSignatureError:
-            raise HttpError("Token Expired",401)
+        raise HttpError("Token Expired", 401, UNAUTHORIZED_HEADERS)
     except jwt.InvalidTokenError:
-            raise HttpError("Invalid Token",401)
-    
-    return await func(*args,request,**kwargs)
-  
-  return wrapper
+        raise HttpError("Invalid Token", 401, UNAUTHORIZED_HEADERS)
+
+    # Kept for backwards compatibility with helpers.get_current_user.
+    context.request.state.user = decoded_user
+    return decoded_user
+
+
+#: Auth guard. Rejects a missing/invalid/expired token with 401 and publishes
+#: the decoded payload as "user" for later guards and CurrentUser.
+Protected = create_guard(jwt_guard, security=bearer_scheme, provides="user")

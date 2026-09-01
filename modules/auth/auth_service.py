@@ -3,10 +3,10 @@ import jwt
 from modules.auth.dtos import LoginDTO,SignupDTO
 from modules.user import UserService
 from utils import HttpError
-from passlib.context import CryptContext
 from modules.common.services.config_service import config_service
+from modules.user.dtos import CreateUserDTO, UserPublicDTO
+from utils.security import verify_password
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 SECRET_KEY = config_service.get("JWT_SECRET")# use env variable in real app
 ALGORITHM = config_service.get("JWT_ALGORITHM")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(config_service.get("JWT_EXPIRE_TIME")) 
@@ -21,7 +21,7 @@ class AuthService:
     if not user:
         raise HttpError("User not found",404)
     
-    if not pwd_context.verify(body.password, user.password):
+    if not verify_password(body.password, user.password):
       raise HttpError("Password does not match", 404)
     
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -29,13 +29,7 @@ class AuthService:
         data={"username": user.username,"id":user.id}, expires_delta=access_token_expires
     )
 
-    return {
-        "message": "Successfully logged in",
-        "data": {
-            "user": user,
-            "access_token": access_token
-        }
-    }
+    return {"user": UserPublicDTO.model_validate(user), "accessToken": access_token}
 
   async def register(self, body: SignupDTO):
     # Check if user exists
@@ -43,14 +37,10 @@ class AuthService:
     if user:
         raise HttpError("User with this user name already exists", 429)
 
-    # Hash password (sync, do NOT await)
-    hashed_password = pwd_context.hash(body.password)
-
-    # Create user
-    user = await self.user_service.create_user({
-        "username": body.username,
-        "password": hashed_password
-    })
+    # UserService hashes the password, so pass it through as-is.
+    user = await self.user_service.create_user(
+        CreateUserDTO(username=body.username, password=body.password)
+    )
 
     # Create JWT token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -58,13 +48,7 @@ class AuthService:
         data={"username": body.username,"id":user.id}, expires_delta=access_token_expires
     )
 
-    return {
-        "message": "Successfully registered a user",
-        "data": {
-            "user": user,
-            "access_token": access_token
-        }
-    }
+    return {"user": UserPublicDTO.model_validate(user), "accessToken": access_token}
 
 
   

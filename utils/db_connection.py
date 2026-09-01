@@ -1,5 +1,10 @@
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.ext.asyncio import (
+    AsyncAttrs,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
+from sqlalchemy.orm import DeclarativeBase
 from modules.common.services import config_service
 
 DATABASE_URL: str = config_service.get("DATABASE_URL")
@@ -19,14 +24,16 @@ engine = create_async_engine(
     },
 )
 
-AsyncSessionLocal = sessionmaker(
+AsyncSessionLocal = async_sessionmaker(
     bind=engine,
-    class_=AsyncSession,
     expire_on_commit=False,
     autoflush=False,
 )
 
-Base = declarative_base()
+
+class Base(AsyncAttrs, DeclarativeBase):
+    """Declarative base for all ORM models (SQLAlchemy 2.0 style)."""
+
 
 # FastAPI dependency
 async def get_db() -> AsyncSession:

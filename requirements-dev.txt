@@ -1,0 +1,7 @@
+# Test dependencies
+pytest
+
+# Optional: only needed if you switch tests/asgi_client.py for Starlette's
+# TestClient, which requires httpx.
+# httpx
+# pytest-asyncio

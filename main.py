@@ -1,9 +1,10 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.security import HTTPBearer
 from utils.container import container
-from utils.db_connection import AsyncSessionLocal, engine, Base
+from utils.db_connection import AsyncSessionLocal, engine
 from router import api_router
 from modules.common.interceptors import ResponseInterceptor
 from modules.common.middlewares import (
@@ -14,8 +15,7 @@ from modules.common.middlewares import (
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    # Schema is managed by Alembic: `alembic upgrade head`
     yield
     await engine.dispose()
 
@@ -32,6 +32,9 @@ def create_app() -> FastAPI:
     app.add_middleware(ResponseInterceptor)
 
     # Exception handlers
+    # Starlette's base class covers router-raised 404/405 as well as
+    # FastAPI's own HTTPException subclass.
+    app.add_exception_handler(StarletteHTTPException, HttpErrorHandler)
     app.add_exception_handler(HTTPException, HttpErrorHandler)
     app.add_exception_handler(Exception, GenericErrorHandler)
     app.add_exception_handler(RequestValidationError, ValidationExceptionHandler)
