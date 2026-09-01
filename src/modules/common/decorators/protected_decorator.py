@@ -2,7 +2,7 @@
 import jwt
 from fastapi.security import HTTPBearer
 
-from src.modules.common.services import config_service
+from src.modules.common.services.config_service import config_service
 from src.utils.decorators import ExecutionContext, create_guard
 from src.utils.expection import HttpError
 

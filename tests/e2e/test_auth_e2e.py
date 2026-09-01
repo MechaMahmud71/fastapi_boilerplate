@@ -1,7 +1,7 @@
 """End-to-end auth flows against the real app and database."""
 import jwt
 
-from src.modules.common.services import config_service
+from src.modules.common.services.config_service import config_service
 
 
 def test_register_creates_a_user_and_returns_a_token(client):

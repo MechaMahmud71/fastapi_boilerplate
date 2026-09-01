@@ -14,6 +14,7 @@ migrations.
   - [Layers](#layers)
   - [Request lifecycle](#request-lifecycle)
   - [Dependency injection](#dependency-injection)
+  - [Imports](#imports)
   - [Response envelope](#response-envelope)
   - [Error handling](#error-handling)
   - [Authentication](#authentication)
@@ -157,6 +158,33 @@ method, so the injected service is available to every handler via `self`.
 The session factory is injected as a *factory*, not a session. Each repository
 method opens and closes its own `async with self.db_factory() as db:` scope,
 so a session never outlives a single call.
+
+### Imports
+
+The project uses **implicit namespace packages** — there are no `__init__.py`
+files anywhere. Every import names the module that actually defines the symbol:
+
+```python
+from src.modules.user.user_service import UserService
+from src.modules.user.dtos.create_dto import CreateUserDTO
+from src.modules.common.decorators.protected_decorator import Protected
+from src.utils.expection import HttpError
+```
+
+Package-level re-exports (`from src.modules.user import UserService`) are
+deliberately absent. They read more nicely, but they made importing any symbol
+from a package execute that package's whole `__init__.py` — which pulled the
+controller, and therefore the decorators and `utils`, into every service. That
+produced a genuine import cycle: `src.utils` → `container` → controllers →
+services → `src.utils`, which is why nothing could be imported except through
+`main`.
+
+Two consequences worth knowing:
+
+* **Every module imports standalone**, so a test can import one service without
+  building the whole app.
+* **Packaging needs `find_namespace_packages()`**, not `find_packages()` — the
+  latter skips directories without `__init__.py` and would ship nothing.
 
 ### Response envelope
 
@@ -404,7 +432,12 @@ Two implementation details worth knowing:
 │   │   │   ├── user_repository.py
 │   │   │   ├── user_model.py
 │   │   │   └── dtos/                    # Create / Update / UserPublic
-│   │   ├── todo/                # scaffolded, not implemented
+│   │   ├── todo/                # todo CRUD, owned by a user
+│   │   │   ├── todo_controller.py
+│   │   │   ├── todo_service.py          # ownership rules
+│   │   │   ├── todo_repository.py
+│   │   │   ├── todo_model.py            # FK to users, ON DELETE CASCADE
+│   │   │   └── dtos/                    # Create / Update / TodoPublic
 │   │   └── common/              # cross-cutting concerns
 │   │       ├── interceptors/            # ResponseInterceptor
 │   │       ├── middlewares/             # error handlers
@@ -515,11 +548,84 @@ docker exec container-postgres psql -U faruk -d todo -c '\dt'
 ### 5. Run the app
 
 ```bash
+source venv/bin/activate          # skip if your venv is already active
 uvicorn main:app --reload
+```
+
+The server starts on <http://127.0.0.1:8000>. `--reload` restarts it whenever a
+file changes — use it in development only.
+
+**Common variations:**
+
+```bash
+# pick a port (handy when 8000 is taken)
+uvicorn main:app --reload --port 8001
+
+# reachable from other devices on your network (phone, another laptop, Docker)
+uvicorn main:app --host 0.0.0.0 --port 8000
+
+# production: several worker processes, no reloader
+uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
+
+# quieter, or noisier
+uvicorn main:app --reload --log-level warning
+uvicorn main:app --reload --log-level debug
+
+# without activating the venv
+./venv/bin/uvicorn main:app --reload
+
+# if the `uvicorn` command is not on your PATH
+python -m uvicorn main:app --reload
+```
+
+**Full start from cold** — every step needed after a reboot:
+
+```bash
+docker compose up -d postgres     # 1. database
+source venv/bin/activate          # 2. environment
+alembic upgrade head              # 3. schema (no-op if already current)
+uvicorn main:app --reload         # 4. server
+```
+
+**Stopping:** `Ctrl+C` in the terminal running uvicorn. To stop a server you
+started in the background, and the database:
+
+```bash
+pkill -f "uvicorn main:app"
+docker compose down               # add -v to also delete the database volume
 ```
 
 | URL                                              | What                    |
 | ------------------------------------------------ | ----------------------- |
+| <http://127.0.0.1:8000>                          | API root                |
+| <http://127.0.0.1:8000/docs>                     | Swagger UI              |
+| <http://127.0.0.1:8000/redoc>                    | ReDoc                   |
+| <http://127.0.0.1:8000/openapi.json>             | OpenAPI schema          |
+
+Smoke test — register a user, then call a protected route with the token it
+returns:
+
+```bash
+curl -X POST http://127.0.0.1:8000/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"alice","password":"secret123"}'
+
+TOKEN="<accessToken from the response>"
+
+curl http://127.0.0.1:8000/users/me -H "Authorization: Bearer $TOKEN"
+```
+
+**Troubleshooting:**
+
+| Symptom | Cause |
+| --- | --- |
+| `ERROR: [Errno 48] Address already in use` | Another process holds the port — use `--port 8001`, or `pkill -f "uvicorn main:app"` |
+| `TypeError: unsupported operand type(s) for \|` | Python 3.9 — this project needs **3.10+** |
+| `ConnectionRefusedError` on the first request | PostgreSQL is not running: `docker compose up -d postgres` |
+| `relation "users" does not exist` | Migrations not applied: `alembic upgrade head` |
+| `AttributeError: 'NoneType' ... DATABASE_URL` | No `.env` file: `cp .env.example .env` |
+
+------------------------------------------------ | ----------------------- |
 | <http://127.0.0.1:8000>                          | API root                |
 | <http://127.0.0.1:8000/docs>                     | Swagger UI              |
 | <http://127.0.0.1:8000/redoc>                    | ReDoc                   |
@@ -608,6 +714,45 @@ Both return `data: { user, accessToken }`.
 
 User responses are serialised through `UserPublicDTO` (`id`, `username`), so a
 password hash is never returned. A duplicate username is a `409`.
+
+### Todos — `/todos`
+
+Every todo belongs to exactly one user (**one-to-many**), and every route is
+scoped to the caller's own todos.
+
+| Method   | Path            | Auth | Success | Description                        |
+| -------- | --------------- | ---- | ------- | ---------------------------------- |
+| `POST`   | `/todos/`       | JWT  | `201`   | Create a todo for the current user |
+| `GET`    | `/todos/`       | JWT  | `200`   | List the caller's todos (paginated)|
+| `GET`    | `/todos/{id}`   | JWT  | `200`   | Fetch one (`404` if not yours)     |
+| `PUT`    | `/todos/{id}`   | JWT  | `200`   | Partial update (`404` if not yours)|
+| `DELETE` | `/todos/{id}`   | JWT  | `200`   | Delete (`404` if not yours)        |
+
+`GET /todos/` accepts `completed` (`true`/`false`), `limit` (1–100, default 50)
+and `offset`, and returns a paginated envelope where `total` is the unpaginated
+count:
+
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {"id": 1, "title": "buy milk", "description": "2L", "completed": false, "user_id": 7}
+    ],
+    "total": 1,
+    "limit": 50,
+    "offset": 0
+  },
+  "message": null
+}
+```
+
+**A todo belonging to another user returns `404`, not `403`.** A `403` would
+confirm the id exists; `404` reveals nothing about other users' data.
+
+**Deleting a user deletes their todos.** The foreign key is
+`ON DELETE CASCADE`, and the relationship uses `passive_deletes=True` so the
+database performs the cascade rather than SQLAlchemy loading each row.
 
 Example of an authenticated call:
 
@@ -910,9 +1055,9 @@ tests themselves will not change.
   connection pool is bound to the loop that opened its connections, so a
   per-test loop would fail on the second request.
 
-Every `conftest.py` imports `main` first: `modules.*` and `utils.*` have a
-circular import that only resolves when the app package is imported as a whole.
-Do the same in any new test module that imports app code directly.
+Any module can be imported on its own — `tests/e2e/conftest.py` imports `main`
+only because the e2e suite drives the real app, not to work around an import
+cycle.
 
 ## Adding a new module
 
@@ -953,6 +1098,7 @@ Using `todo` as the example (the directory is already scaffolded):
    ```
 
    …and add `"src.modules.todo"` to the `WiringConfiguration` packages list.
+   Do not add an `__init__.py` — see [Imports](#imports).
 
 7. **Mount in** [`router.py`](router.py):
 
@@ -973,11 +1119,8 @@ None outstanding — the items previously listed here (plaintext passwords on
 `@Protected` decorator, the `__inti__.py` typo and the dotted `todo.*.py`
 filenames) have all been fixed and have regression tests.
 
-Two things to be aware of rather than bugs:
+One thing to be aware of rather than a bug:
 
-1. **`src/modules/todo/` is scaffolded but empty.** The files are named correctly
-   now (`todo_service.py`, …) and ready to fill in — see
-   [Adding a new module](#adding-a-new-module).
-2. **`JWT_SECRET` in `.env.example` is a development placeholder.** Generate a
+1. **`JWT_SECRET` in `.env.example` is a development placeholder.** Generate a
    real one before deploying (`python -c "import secrets; print(secrets.token_urlsafe(32))"`).
    PyJWT warns at runtime when the key is shorter than 32 bytes.

@@ -8,7 +8,7 @@ import asyncio
 import pytest
 from sqlalchemy import text
 
-import main  # noqa: F401  (also resolves the modules/utils circular import)
+import main  # noqa: F401  (builds the app the e2e suite drives)
 from src.utils.db_connection import engine
 
 
@@ -51,6 +51,8 @@ def clean_users(loop, require_database):
 
     async def truncate():
         async with engine.begin() as connection:
+            # todos first: they reference users
+            await connection.execute(text("DELETE FROM todos"))
             await connection.execute(text("DELETE FROM users"))
 
     loop.run_until_complete(truncate())
@@ -76,4 +78,11 @@ def register(client):
 @pytest.fixture
 def auth_headers(register):
     _, token = register()
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def other_headers(register):
+    """A second, unrelated user — for testing data isolation."""
+    _, token = register("bob", "secret123")
     return {"Authorization": f"Bearer {token}"}

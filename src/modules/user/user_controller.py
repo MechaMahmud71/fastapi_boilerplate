@@ -3,9 +3,12 @@ from typing import List
 
 from fastapi import APIRouter, status
 
-from src.modules.common.decorators import CurrentUser, Protected
+from src.modules.common.decorators.user_decorator import CurrentUser
+from src.modules.common.decorators.protected_decorator import Protected
 
-from .dtos import CreateUserDTO, UpdateUserDTO, UserPublicDTO
+from src.modules.user.dtos.create_dto import CreateUserDTO
+from src.modules.user.dtos.update_dto import UpdateUserDTO
+from src.modules.user.dtos.user_public_dto import UserPublicDTO
 from .user_service import UserService
 
 

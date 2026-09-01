@@ -1,10 +1,11 @@
 # services/user_service.py
 from typing import Optional, Sequence
 
-from src.utils import HttpError
+from src.utils.expection import HttpError
 from src.utils.security import hash_password
 
-from .dtos import CreateUserDTO, UpdateUserDTO
+from src.modules.user.dtos.create_dto import CreateUserDTO
+from src.modules.user.dtos.update_dto import UpdateUserDTO
 from .user_model import User
 from .user_repository import UserRepository
 

@@ -1,10 +1,12 @@
 from datetime import datetime, timedelta, timezone
 import jwt
-from src.modules.auth.dtos import LoginDTO,SignupDTO
-from src.modules.user import UserService
-from src.utils import HttpError
+from src.modules.auth.dtos.login_dto import LoginDTO
+from src.modules.auth.dtos.signup_dto import SignupDTO
+from src.modules.user.user_service import UserService
+from src.utils.expection import HttpError
 from src.modules.common.services.config_service import config_service
-from src.modules.user.dtos import CreateUserDTO, UserPublicDTO
+from src.modules.user.dtos.create_dto import CreateUserDTO
+from src.modules.user.dtos.user_public_dto import UserPublicDTO
 from src.utils.security import verify_password
 
 SECRET_KEY = config_service.get("JWT_SECRET")# use env variable in real app

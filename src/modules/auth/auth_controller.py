@@ -1,6 +1,7 @@
 from fastapi import APIRouter,Depends
 from .auth_service import AuthService
-from .dtos import LoginDTO,SignupDTO
+from src.modules.auth.dtos.login_dto import LoginDTO
+from src.modules.auth.dtos.signup_dto import SignupDTO
 
 class AuthController:
   def __init__(self,auth_service:AuthService):

@@ -1,10 +1,11 @@
 """UserService delegation, with a fake repository (no database)."""
 import pytest
 
-from src.utils import HttpError
+from src.utils.expection import HttpError
 from src.utils.security import verify_password
 
-from src.modules.user.dtos import CreateUserDTO, UpdateUserDTO
+from src.modules.user.dtos.create_dto import CreateUserDTO
+from src.modules.user.dtos.update_dto import UpdateUserDTO
 from src.modules.user.user_model import User
 from src.modules.user.user_service import UserService
 

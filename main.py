@@ -6,12 +6,10 @@ from fastapi.security import HTTPBearer
 from src.utils.container import container
 from src.utils.db_connection import AsyncSessionLocal, engine
 from router import api_router
-from src.modules.common.interceptors import ResponseInterceptor
-from src.modules.common.middlewares import (
-    HttpErrorHandler,
-    GenericErrorHandler,
-    ValidationExceptionHandler,
-)
+from src.modules.common.interceptors.response_interceptor import ResponseInterceptor
+from src.modules.common.middlewares.error_handler_middleware import HttpErrorHandler
+from src.modules.common.middlewares.error_handler_middleware import GenericErrorHandler
+from src.modules.common.middlewares.error_handler_middleware import ValidationExceptionHandler
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

@@ -1,10 +1,4 @@
-"""Shared fixtures.
-
-`import main` first: modules.* and utils.* have a circular import that only
-resolves when the app package is imported as a whole.
-"""
-import main  # noqa: F401  isort:skip
-
+"""Shared fixtures."""
 import asyncio
 import inspect
 from datetime import datetime, timedelta, timezone
@@ -41,7 +35,7 @@ def pytest_pyfunc_call(pyfuncitem):
         asyncio.run(test(**kwargs))
     return True
 
-from src.modules.common.services import config_service
+from src.modules.common.services.config_service import config_service
 
 
 def make_token(claims: dict = None, expires_in_minutes: int = 60) -> str:

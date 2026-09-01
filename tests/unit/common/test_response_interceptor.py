@@ -3,14 +3,12 @@ import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
 
-from src.modules.common.interceptors import ResponseInterceptor
-from src.modules.common.middlewares import (
-    GenericErrorHandler,
-    HttpErrorHandler,
-    ValidationExceptionHandler,
-)
+from src.modules.common.interceptors.response_interceptor import ResponseInterceptor
+from src.modules.common.middlewares.error_handler_middleware import GenericErrorHandler
+from src.modules.common.middlewares.error_handler_middleware import HttpErrorHandler
+from src.modules.common.middlewares.error_handler_middleware import ValidationExceptionHandler
 from tests.asgi_client import ASGIClient
-from src.utils import HttpError
+from src.utils.expection import HttpError
 
 
 @pytest.fixture
