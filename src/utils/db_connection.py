@@ -19,8 +19,8 @@ engine = create_async_engine(
     echo=False,
     pool_pre_ping=True,
     connect_args={
-        "statement_cache_size": 0,          # 🚀 disable asyncpg cache
-        "prepared_statement_cache_size": 0  # 🚀 asyncpg >= 0.29
+        "statement_cache_size": 0,        
+        "prepared_statement_cache_size": 0
     },
 )
 

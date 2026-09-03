@@ -10,7 +10,7 @@ from src.modules.todo.todo_service import TodoService
 from src.modules.user.user_repository import UserRepository
 from src.modules.user.user_service import UserService
 from src.modules.user.user_controller import UserController
-from src.utils.db_connection import AsyncSessionLocal  # ✅ use async session factory
+from src.utils.db_connection import AsyncSessionLocal 
 
 
 class Container(containers.DeclarativeContainer):
